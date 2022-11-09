@@ -37,17 +37,7 @@ class AdobeAnalytics:
         self.ACCESS_TOKEN = self._get_access_token_()
         self.BASE_REPORTING_URL = self._get_global_id_()
 
-    def _get_access_token_(self, expiration_date: dt.datetime = None):
-        """Returns the access token required for auth with adobe apis"""
-        # if no expiration date (set one for 1 day in the future)
-        # if there is one, convert it to a timestamp
-        if expiration_date is None:
-            expiration_date = int(
-                (dt.datetime.now() + dt.timedelta(days=1)).timestamp()
-            )
-        else:
-            expiration_date = int(expiration_date.timestamp())
-
+    def _get_jwt_token(self, expiration_date: dt.datetime):
         # CREATE JWT PAYLOAD
         # https://github.com/AdobeDocs/adobeio-auth/blob/stage/JWT/JWT.md#required-claims-for-a-service-account-jwt
         jwt_payload = {
@@ -61,13 +51,26 @@ class AdobeAnalytics:
         with open("./creds/keys/private.key", "r") as f:
             PRIVATE_KEY = f.read()
         # ENCODE JWT
-        encoded_jwt = jwt.encode(jwt_payload, PRIVATE_KEY, algorithm="RS256")
+        return jwt.encode(jwt_payload, PRIVATE_KEY, algorithm="RS256")
+
+    def _get_access_token_(self, expiration_date: dt.datetime = None):
+        """Returns the access token required for auth with adobe apis"""
+        # if no expiration date (set one for 1 day in the future)
+        # if there is one, convert it to a timestamp
+        if expiration_date is None:
+            expiration_date = int(
+                (dt.datetime.now() + dt.timedelta(days=1)).timestamp()
+            )
+        else:
+            expiration_date = int(expiration_date.timestamp())
+
+        jwt = self._get_jwt_token(expiration_date)
         # EXCHANGE JWT for ACCESS TOKEN
         # https://github.com/AdobeDocs/adobeio-auth/blob/stage/JWT/JWT.md#exchanging-jwt-to-retrieve-an-access-token
         access_payload = {
             "client_id": os.environ["CLIENT_ID"],
             "client_secret": os.environ["CLIENT_SECRET"],
-            "jwt_token": encoded_jwt,
+            "jwt_token": jwt,
         }
         # MAKE THE REQUEST
         access_token_response = requests.post(JWT_URL, data=access_payload)
