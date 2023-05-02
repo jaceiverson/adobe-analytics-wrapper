@@ -26,7 +26,12 @@ class RequestType(Enum):
 
 
 class AdobeAnalytics:
-    def __init__(self, rsid: str = None, console: Optional[Console] = None) -> None:
+    def __init__(
+        self,
+        rsid: str = None,
+        console: Optional[Console] = None,
+        private_key_path: str = "./adobe-credentials/keys/preivate.key",
+    ) -> None:
         """on init, will get access token using a jwt payload"""
         self.RSID = rsid
         if console:
@@ -34,6 +39,7 @@ class AdobeAnalytics:
         else:
             self.console = Console()
 
+        self.private_key_path = private_key_path
         self.ACCESS_TOKEN = self._get_access_token_()
         self.BASE_REPORTING_URL = self._get_global_id_()
 
@@ -48,7 +54,7 @@ class AdobeAnalytics:
             "aud": f"https://ims-na1.adobelogin.com/c/{os.environ['CLIENT_ID']}",
         }
         # read in our private key
-        with open("./creds/keys/private.key", "r") as f:
+        with open(self.private_key_path, "r") as f:
             PRIVATE_KEY = f.read()
         # ENCODE JWT
         return jwt.encode(jwt_payload, PRIVATE_KEY, algorithm="RS256")
@@ -87,22 +93,24 @@ class AdobeAnalytics:
         ]
         return f"https://analytics.adobe.io/api/{self.GLOBAL_CO_ID}/"
 
-    def from_workspace(self, workspace_json: Union[dict, str]) -> dict:
+    def from_workspace(
+        self, workspace_json: Union[dict, str], indv_log: bool = False
+    ) -> dict:
         # if it is a string (file path) we will read the json file
         if isinstance(workspace_json, str):
             workspace_json = read_json(workspace_json)
 
         metric_count = workspace_json["metricContainer"].get("metrics")
-
-        self.console.log(
-            f"Pulling API from workspace JSON for {len(metric_count) if metric_count else None } metrics",
-        )
+        if indv_log:
+            self.console.log(
+                f"Pulling API from workspace JSON for {len(metric_count) if metric_count else None } metrics",
+            )
         response = requests.post(
             url=f"{self.BASE_REPORTING_URL}reports",
             headers=self.make_header(),
             json=workspace_json,
         )
-        if str(response.status_code).startswith("2"):
+        if response.ok:
             return response.json()
 
     def make_header(self, additional_header: dict = None, global_id: bool = False):
